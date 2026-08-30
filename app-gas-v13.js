@@ -1,8 +1,8 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v13.2';
+const APP_VERSION='v13.3';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let password='', accessToken=String(window.CHEONGUN_ACCESS_TOKEN||''), tab='home', selected=1, journalHouse=0, graphHouse=0, graphPointAge=0, showBonus=false, haccpType='오늘점검', editingNoteAge=0;
+let password='', accessToken='no-password', tab='home', selected=1, journalHouse=0, graphHouse=0, graphPointAge=0, showBonus=false, haccpType='오늘점검', editingNoteAge=0;
 let db=JSON.parse(localStorage.getItem('cheongun-local')||'null')||{placementDate:today(),bonus:3,houses:[20000,20000,20000,20000,20000],entries:[],shipments:[],haccp:[],medicine:[],queue:[]};
 if(!Array.isArray(db.dayNotes))db.dayNotes=[];
 let syncPromise=null;
@@ -63,7 +63,7 @@ function login(e){
   .withFailureHandler(function(error){password='';message.textContent='서버 오류: '+(error&&error.message?error.message:String(error))})
   .apiRequest(JSON.stringify({action:'login',password:p}));
 }
-$('#loginForm').addEventListener('submit',login);$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;tab=b.dataset.tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x===b));render()});
+if($('#loginForm'))$('#loginForm').addEventListener('submit',login);$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;tab=b.dataset.tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x===b));render()});
 function render(){ $('#ageLabel').textContent=`입추 ${db.placementDate} · ${age()}일령`;({home:homeView,journal:journalViewExact,graph:graphView,ship:shipView,settings:settingsView,haccp:haccpView}[tab]||homeView)() }
 function page(title,sub,body){$('#view').innerHTML=`<div class="page"><div class="title"><div><h1>${title}</h1><p>${sub}</p></div></div>${body}</div>`}
 function todayByHouse(h){return db.entries.filter(x=>x.date===today()&&x.house===h).reduce((a,x)=>({death:a.death+x.death,cull:a.cull+x.cull}),{death:0,cull:0})}
@@ -151,4 +151,4 @@ window.addEventListener('offline',sync);
 window.addEventListener('pageshow',()=>{if(accessToken)sync()});
 document.addEventListener('visibilitychange',()=>{if(accessToken&&document.visibilityState==='visible')sync()});
 setInterval(()=>{if(accessToken&&navigator.onLine&&document.visibilityState==='visible')sync()},30000);
-if(accessToken){$('#login').style.display='none';$('#login').hidden=true;$('#app').hidden=false;$('#app').style.display='block';render();sync()}else{$('#login').style.display='grid';$('#login').hidden=false;$('#app').hidden=true}
+if($('#login')){$('#login').style.display='none';$('#login').hidden=true}$('#app').hidden=false;$('#app').style.display='block';render();sync()
