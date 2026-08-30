@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#176b3a"><title>청운농장 육계 사육관리</title><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"></head>
+<body>
+<div id="login" class="login"><form id="loginForm" class="login-card"><div class="logo">청</div><h1>청운농장</h1><p>육계 사육관리 공동앱</p><label>농장 공용 비밀번호<input id="password" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="숫자 6자리" required></label><button>농장 앱 시작</button><small>처음 한 번만 입력하면 이 휴대전화에 안전하게 보관됩니다.</small><b id="loginError"></b></form></div>
+<main id="app" hidden><header><div><strong>청운농장</strong><span id="ageLabel">사육 준비</span></div><div id="syncState" class="sync">● 연결 확인</div></header><section id="view"></section><nav id="nav"><button data-tab="home" class="active">⌂<span>홈</span></button><button data-tab="journal">▤<span>사육일지</span></button><button data-tab="graph">⌁<span>그래프</span></button><button data-tab="ship">▣<span>부분출하</span></button><button data-tab="settings">⚙<span>설정</span></button><button data-tab="haccp">✓<span>HACCP</span></button></nav></main>
+<div id="toast"></div><script src="app.js"></script></body></html>
