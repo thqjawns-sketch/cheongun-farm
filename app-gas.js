@@ -6,7 +6,15 @@ let db=JSON.parse(localStorage.getItem('cheongun-local')||'null')||{placementDat
 const saveLocal=()=>localStorage.setItem('cheongun-local',JSON.stringify(db));
 const age=()=>Math.max(1,Math.min(40,Math.floor((new Date(today())-new Date(db.placementDate))/86400000)+1));
 const toast=m=>{const x=$('#toast');x.textContent=m;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2500)};
-async function api(body){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).apiRequest(JSON.stringify({...body,password})))}
+async function api(body){
+ return new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(new Error('서버 응답 시간이 초과되었습니다.')),15000);
+  google.script.run
+   .withSuccessHandler(result=>{clearTimeout(timer);resolve(result)})
+   .withFailureHandler(error=>{clearTimeout(timer);reject(new Error(error&&error.message?error.message:String(error)))})
+   .apiRequest(JSON.stringify({...body,password}));
+ });
+}
 function setSync(cls,text){const x=$('#syncState');x.className='sync '+cls;x.textContent='● '+text}
 async function sync(){if(!password||!navigator.onLine){setSync('off','오프라인 저장');return}try{setSync('','동기화 중');if(db.queue.length){const q=[...db.queue],r=await api({action:'push',operations:q});if(!r.ok)throw Error(r.error);db.queue=[]}const pulled=await api({action:'pull'});if(!pulled.ok)throw Error(pulled.error);mergeRemote(pulled.data||{});saveLocal();setSync('ok','시트 동기화 완료');render()}catch(e){saveLocal();setSync('off','전송 대기 '+db.queue.length+'건')}}
 function mergeById(local,remote,map){const all=new Map(local.map(x=>[x.id,x]));remote.forEach(r=>{if(String(r.deleted)==='true'||r.deleted===true)all.delete(String(r.id));else all.set(String(r.id),map(r))});return [...all.values()]}
