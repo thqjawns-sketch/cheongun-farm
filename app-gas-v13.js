@@ -1,5 +1,5 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v14.4';
+const APP_VERSION='v14.5';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TODAY_CHECK_ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
@@ -21,6 +21,7 @@ async function api(body){
 }
 function setSync(cls,text){const x=$('#syncState');x.className='sync '+cls;x.textContent='● '+text}
 function syncTime(){return new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function homeInputInProgress(){if(tab!=='home')return false;const death=$('#death'),cull=$('#cull'),note=$('#note');return Boolean((death&&Number(death.value)>0)||(cull&&Number(cull.value)>0)||(note&&note.value.trim()))}
 async function sync(){
  if(syncPromise)return syncPromise;
  syncPromise=(async()=>{
@@ -41,7 +42,8 @@ async function sync(){
    mergeRemote(pulled.data||{});mergeMedicine(pulled.data||{});
    saveLocal();
    setSync('ok','시트 최신 · '+syncTime()+' · '+APP_VERSION);
-   if(!reportOpen&&!formEditing)render();
+   // 시트 자료는 최신화하되, 당일 기록을 입력 중이면 화면을 다시 그려 입력값을 지우지 않습니다.
+   if(!reportOpen&&!formEditing&&!homeInputInProgress())render();
   }catch(e){saveLocal();setSync('off',navigator.onLine?`동기화 실패 · 대기 ${db.queue.length}건`:`오프라인 저장 · 대기 ${db.queue.length}건`)}
  })();
  try{return await syncPromise}finally{syncPromise=null;if(db.queue.length&&navigator.onLine)setTimeout(sync,250)}
