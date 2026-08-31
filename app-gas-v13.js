@@ -1,5 +1,5 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v14.5';
+const APP_VERSION='v14.6';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TODAY_CHECK_ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
@@ -67,6 +67,11 @@ function login(e){
   .apiRequest(JSON.stringify({action:'login',password:p}));
 }
 if($('#loginForm'))$('#loginForm').addEventListener('submit',login);$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;reportOpen=false;formEditing=false;tab=b.dataset.tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x===b));render()});
+// 어느 화면이든 사용자가 작성·선택을 시작하면 자동 동기화가 화면을 다시 그리지 못하게 합니다.
+// 시트 통신과 로컬 저장은 그대로 진행되며, 다른 메뉴로 이동할 때만 보호 상태가 해제됩니다.
+$('#view').addEventListener('input',e=>{if(e.target.matches('input,textarea,select'))formEditing=true});
+$('#view').addEventListener('change',e=>{if(e.target.matches('input,textarea,select'))formEditing=true});
+$('#view').addEventListener('click',e=>{if(e.target.closest('[data-digit],[data-add],[data-clear],[data-back],[data-temp-step],[data-humidity-step],[data-check],[data-action],[data-area],[data-method],[data-use-house],[data-allocation],[data-use-container],[data-use-part],[data-in-count],[data-quick-count],[data-med-size],[data-hhouse]'))formEditing=true});
 function render(){ $('#ageLabel').textContent=`입추 ${db.placementDate} · ${age()}일령`;({home:homeView,journal:journalViewExact,graph:graphView,ship:shipView,settings:settingsView,haccp:haccpView}[tab]||homeView)() }
 function page(title,sub,body){$('#view').innerHTML=`<style>.houses:has([data-hhouse]){display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:3px!important;flex-wrap:nowrap!important}.houses [data-hhouse]{width:100%!important;min-width:0!important;height:36px!important;min-height:36px!important;padding:0 1px!important;font-size:11px!important}</style><div class="page"><div class="title"><div><h1>${title}</h1><p>${sub}</p></div></div>${body}</div>`}
 function todayByHouse(h){return db.entries.filter(x=>x.date===today()&&x.house===h).reduce((a,x)=>({death:a.death+x.death,cull:a.cull+x.cull}),{death:0,cull:0})}
