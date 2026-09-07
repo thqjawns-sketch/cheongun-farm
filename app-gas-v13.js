@@ -1,5 +1,5 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v15.2';
+const APP_VERSION='v15.3';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TODAY_CHECK_ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
@@ -36,8 +36,12 @@ async function sync(){
   if(!accessToken||!navigator.onLine){setSync('off',`오프라인 저장 · 대기 ${db.queue.length}건`);return}
   try{
    setSync('','시트 확인 중');
+   let justPushedEntries=[];
    if(db.queue.length){
-    const q=[...db.queue],r=await api({action:'push',operations:q});
+    const q=[...db.queue];
+    const localEntries=new Map(db.entries.map(x=>[String(x.id),x]));
+    justPushedEntries=q.filter(x=>x.sheet==='폐사도태기록'&&String(x.row&&x.row.deleted)!=='true').map(x=>localEntries.get(String(x.row.id))).filter(Boolean);
+    const r=await api({action:'push',operations:q});
     if(!r.ok)throw Error(r.error);
     db.queue=db.queue.slice(q.length);
     saveLocal();
@@ -48,6 +52,9 @@ async function sync(){
    if(!pulled.ok)throw Error(pulled.error);
    // 정상 연결 시 휴대전화의 과거 복사본이 아니라 시트의 현재 전체 자료로 교체합니다.
    mergeRemote(pulled.data||{});mergeMedicine(pulled.data||{});
+   // 시트 쓰기 직후 조회 결과가 늦게 갱신돼도 방금 저장한 당일 기록은 화면에서 사라지지 않게 유지합니다.
+   const remoteEntryIds=new Set(db.entries.map(x=>String(x.id)));
+   justPushedEntries.forEach(x=>{if(!remoteEntryIds.has(String(x.id)))db.entries.push(x)});
    saveLocal();
    setSync('ok','시트 최신 · '+syncTime()+' · '+APP_VERSION);
    // 시트 자료는 최신화하되, 당일 기록을 입력 중이면 화면을 다시 그려 입력값을 지우지 않습니다.
@@ -58,7 +65,7 @@ async function sync(){
 }
 function mergeById(local,remote,map){const all=new Map(local.map(x=>[x.id,x]));remote.forEach(r=>{if(String(r.deleted)==='true'||r.deleted===true)all.delete(String(r.id));else all.set(String(r.id),map(r))});return [...all.values()]}
 function mergeRemote(data){db.dayNotes=(data['일령별특이사항']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),note:String(r['특이사항']||''),updatedAt:String(r.updatedAt||'')}));db.entries=(data['폐사도태기록']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),death:Number(r['폐사']||0),cull:Number(r['도태']||0),note:String(r['특이사항']||''),createdAt:String(r['입력시간']||r.updatedAt)}));db.shipments=(data['부분출하기록']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),count:Number(r['출하수']||0),note:String(r['특이사항']||''),createdAt:String(r['입력시간']||r.updatedAt)}));const hs=[];[['HACCP일일점검','오늘점검'],['소독방역기록','소독·방역'],['약품입고','약품관리'],['교육기록','교육']].forEach(([sheet,type])=>(data[sheet]||[]).forEach(r=>{if(String(r.deleted)!=='true'&&r.deleted!==true)hs.push({id:String(r.id),date:String(r['날짜']).slice(0,10),type,house:Number(r['대상동']||0),target:String(r['작업구분']||r['참석자']||''),product:String(r['사용약품']||r['약품명']||r['교육명']||''),amount:Number(r['입고량']||0),unit:String(r['단위']||''),temp:String(r['온도']||''),humidity:String(r['습도']||''),checks:String(r['점검항목']||''),result:String(r['결과']||''),detail:String(r['내용및조치']||r['교육내용']||''),createdAt:String(r['입력시간']||r.updatedAt)})}));db.haccp=hs;const flock=(data['사육회차']||[]).filter(x=>x['상태']==='진행중').sort((a,b)=>String(b['입추일']).localeCompare(String(a['입추일'])))[0];if(flock){db.placementDate=String(flock['입추일']).slice(0,10);db.bonus=Number(flock['덤비율']||3)}db.houses=[0,0,0,0,0];const houses=(data['계사정보']||[]).filter(x=>String(x['회차ID']).slice(0,10)===db.placementDate);houses.forEach(x=>{const n=Number(x['동']);if(n>=1&&n<=5)db.houses[n-1]=Number(x['공식입추수']||0)})}
-function queue(sheet,row){db.queue.push({sheet,row});saveLocal();sync()}
+function queue(sheet,row){db.queue.push({sheet,row});saveLocal();setTimeout(sync,0)}
 function login(e){
  e.preventDefault();
  const p=$('#password').value;
@@ -74,7 +81,7 @@ function login(e){
   .withFailureHandler(function(error){password='';message.textContent='서버 오류: '+(error&&error.message?error.message:String(error))})
   .apiRequest(JSON.stringify({action:'login',password:p}));
 }
-if($('#loginForm'))$('#loginForm').addEventListener('submit',login);$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;reportOpen=false;formEditing=false;tab=b.dataset.tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x===b));render()});
+if($('#loginForm'))$('#loginForm').addEventListener('submit',login);$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;reportOpen=false;formEditing=false;homeHouse=0;tab=b.dataset.tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x===b));render()});
 // 어느 화면이든 사용자가 작성·선택을 시작하면 자동 동기화가 화면을 다시 그리지 못하게 합니다.
 // 시트 통신과 로컬 저장은 그대로 진행되며, 다른 메뉴로 이동할 때만 보호 상태가 해제됩니다.
 $('#view').addEventListener('input',e=>{if(e.target.matches('input,textarea,select'))formEditing=true});
