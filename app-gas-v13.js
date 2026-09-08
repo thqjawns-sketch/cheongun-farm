@@ -1,5 +1,5 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v15.3';
+const APP_VERSION='v15.4';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TODAY_CHECK_ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
@@ -14,6 +14,7 @@ const FARM_EDUCATION_TOPICS={
 let password='', accessToken='no-password', managerPassword='', settingsUnlocked=false, reportOpen=false, formEditing=false, tab='home', selected=1, homeHouse=0, journalHouse=0, graphHouse=0, graphPointAge=0, showBonus=false, haccpType='오늘점검', medTab='반입', medUseHouses=[1], medUseAllocation='total', medInboundSize=1, medInboundUnit='L', medInboundCount=1, medUseContainers=0, medUsePartial=0, editingNoteAge=0, checkTemp=25, checkHumidity=60, todayChecks={};
 let db=JSON.parse(localStorage.getItem('cheongun-local')||'null')||{placementDate:today(),bonus:3,houses:[20000,20000,20000,20000,20000],entries:[],shipments:[],haccp:[],medicine:[],queue:[]};
 if(!Array.isArray(db.dayNotes))db.dayNotes=[];
+if(!Array.isArray(db.pendingEntries))db.pendingEntries=[];
 let syncPromise=null;
 const saveLocal=()=>localStorage.setItem('cheongun-local',JSON.stringify(db));
 const age=()=>Math.max(1,Math.min(40,Math.floor((new Date(today())-new Date(db.placementDate))/86400000)+1));
@@ -36,11 +37,8 @@ async function sync(){
   if(!accessToken||!navigator.onLine){setSync('off',`오프라인 저장 · 대기 ${db.queue.length}건`);return}
   try{
    setSync('','시트 확인 중');
-   let justPushedEntries=[];
    if(db.queue.length){
     const q=[...db.queue];
-    const localEntries=new Map(db.entries.map(x=>[String(x.id),x]));
-    justPushedEntries=q.filter(x=>x.sheet==='폐사도태기록'&&String(x.row&&x.row.deleted)!=='true').map(x=>localEntries.get(String(x.row.id))).filter(Boolean);
     const r=await api({action:'push',operations:q});
     if(!r.ok)throw Error(r.error);
     db.queue=db.queue.slice(q.length);
@@ -54,7 +52,11 @@ async function sync(){
    mergeRemote(pulled.data||{});mergeMedicine(pulled.data||{});
    // 시트 쓰기 직후 조회 결과가 늦게 갱신돼도 방금 저장한 당일 기록은 화면에서 사라지지 않게 유지합니다.
    const remoteEntryIds=new Set(db.entries.map(x=>String(x.id)));
-   justPushedEntries.forEach(x=>{if(!remoteEntryIds.has(String(x.id)))db.entries.push(x)});
+   const pending=[...(db.pendingEntries||[])];
+   // 1~5동 어느 동이든 시트 조회에서 확인될 때까지 로컬 화면 기록을 유지합니다.
+   db.pendingEntries=pending.filter(x=>!remoteEntryIds.has(String(x.id)));
+   const visibleEntryIds=new Set(db.entries.map(x=>String(x.id)));
+   db.pendingEntries.forEach(x=>{if(!visibleEntryIds.has(String(x.id))){db.entries.push(x);visibleEntryIds.add(String(x.id))}});
    saveLocal();
    setSync('ok','시트 최신 · '+syncTime()+' · '+APP_VERSION);
    // 시트 자료는 최신화하되, 당일 기록을 입력 중이면 화면을 다시 그려 입력값을 지우지 않습니다.
@@ -65,7 +67,17 @@ async function sync(){
 }
 function mergeById(local,remote,map){const all=new Map(local.map(x=>[x.id,x]));remote.forEach(r=>{if(String(r.deleted)==='true'||r.deleted===true)all.delete(String(r.id));else all.set(String(r.id),map(r))});return [...all.values()]}
 function mergeRemote(data){db.dayNotes=(data['일령별특이사항']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),note:String(r['특이사항']||''),updatedAt:String(r.updatedAt||'')}));db.entries=(data['폐사도태기록']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),death:Number(r['폐사']||0),cull:Number(r['도태']||0),note:String(r['특이사항']||''),createdAt:String(r['입력시간']||r.updatedAt)}));db.shipments=(data['부분출하기록']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({id:String(r.id),date:String(r['날짜']).slice(0,10),age:Number(r['일령']),house:Number(r['동']),count:Number(r['출하수']||0),note:String(r['특이사항']||''),createdAt:String(r['입력시간']||r.updatedAt)}));const hs=[];[['HACCP일일점검','오늘점검'],['소독방역기록','소독·방역'],['약품입고','약품관리'],['교육기록','교육']].forEach(([sheet,type])=>(data[sheet]||[]).forEach(r=>{if(String(r.deleted)!=='true'&&r.deleted!==true)hs.push({id:String(r.id),date:String(r['날짜']).slice(0,10),type,house:Number(r['대상동']||0),target:String(r['작업구분']||r['참석자']||''),product:String(r['사용약품']||r['약품명']||r['교육명']||''),amount:Number(r['입고량']||0),unit:String(r['단위']||''),temp:String(r['온도']||''),humidity:String(r['습도']||''),checks:String(r['점검항목']||''),result:String(r['결과']||''),detail:String(r['내용및조치']||r['교육내용']||''),createdAt:String(r['입력시간']||r.updatedAt)})}));db.haccp=hs;const flock=(data['사육회차']||[]).filter(x=>x['상태']==='진행중').sort((a,b)=>String(b['입추일']).localeCompare(String(a['입추일'])))[0];if(flock){db.placementDate=String(flock['입추일']).slice(0,10);db.bonus=Number(flock['덤비율']||3)}db.houses=[0,0,0,0,0];const houses=(data['계사정보']||[]).filter(x=>String(x['회차ID']).slice(0,10)===db.placementDate);houses.forEach(x=>{const n=Number(x['동']);if(n>=1&&n<=5)db.houses[n-1]=Number(x['공식입추수']||0)})}
-function queue(sheet,row){db.queue.push({sheet,row});saveLocal();setTimeout(sync,0)}
+function queue(sheet,row){
+ if(sheet==='폐사도태기록'){
+  const id=String(row&&row.id||'');
+  if(String(row&&row.deleted)==='true')db.pendingEntries=(db.pendingEntries||[]).filter(x=>String(x.id)!==id);
+  else{
+   const entry=db.entries.find(x=>String(x.id)===id);
+   if(entry){db.pendingEntries=(db.pendingEntries||[]).filter(x=>String(x.id)!==id);db.pendingEntries.push({...entry})}
+  }
+ }
+ db.queue.push({sheet,row});saveLocal();setTimeout(sync,0)
+}
 function login(e){
  e.preventDefault();
  const p=$('#password').value;
@@ -183,7 +195,7 @@ function settingsView(){
  $('#saveSettings').onclick=()=>{db.placementDate=$('#placement').value;db.bonus=Number($('#bonus').value);document.querySelectorAll('[data-official]').forEach(x=>db.houses[Number(x.dataset.official)]=Number(x.value));queue('사육회차',{id:db.placementDate,입추일:db.placementDate,종료일:'',상태:'진행중',덤비율:db.bonus,createdAt:new Date().toISOString()});db.houses.forEach((n,i)=>queue('계사정보',{id:`${db.placementDate}-${i+1}`,회차ID:db.placementDate,동:i+1,공식입추수:n,createdAt:new Date().toISOString()}));saveLocal();toast('설정 저장 완료');render()};
  $('#forceReload').onclick=forceReloadFromSheet;$('#newFlock').onclick=async()=>{const placementDate=$('#placement').value,bonus=Number($('#bonus').value),houses=[...document.querySelectorAll('[data-official]')].map(x=>Number(x.value||0));if(!placementDate)return alert('새 입추일을 입력해주세요.');const answer=prompt('기존 사육자료가 시트에서 삭제됩니다. 계속하려면 "새파스"라고 입력하세요.');if(answer!=='새파스')return alert('취소되었습니다.');const b=$('#newFlock');b.disabled=true;b.textContent='시트 사육자료 삭제 및 새 파스 생성 중...';try{const r=await api({action:'resetFlock',managerPassword,placementDate,bonus,houses});if(!r.ok)throw Error(r.error);db.entries=[];db.shipments=[];db.dayNotes=[];db.queue=[];db.placementDate=placementDate;db.bonus=bonus;db.houses=houses;saveLocal();toast('새 파스가 시작되었습니다');settingsUnlocked=false;tab='home';document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab==='home'));render();sync()}catch(e){b.disabled=false;b.textContent='기존 사육자료 삭제 후 새 파스 시작';alert('새 파스 시작 실패: '+(e.message||e))}}
 }
-async function forceReloadFromSheet(){const waiting=db.queue.length,warning=waiting?`아직 시트로 전송되지 않은 ${waiting}건의 기록도 삭제됩니다.\n\n`:'';if(!confirm(warning+'정말로 이 휴대전화의 자료를 지우고 시트 기준으로 다시 받으시겠습니까?'))return;try{setSync('','시트 자료 받는 중');const pulled=await api({action:'pull'});if(!pulled.ok)throw Error(pulled.error);db={placementDate:today(),bonus:3,houses:[0,0,0,0,0],entries:[],shipments:[],dayNotes:[],haccp:[],medicine:[],queue:[]};mergeRemote(pulled.data||{});saveLocal();setSync('ok','시트 기준 새로고침 완료 · '+APP_VERSION);toast('시트 내용으로 새로고침했습니다');render()}catch(e){setSync('off','새로고침 실패');alert('시트 새로고침 실패: '+(e.message||e))}}
+async function forceReloadFromSheet(){const waiting=db.queue.length,warning=waiting?`아직 시트로 전송되지 않은 ${waiting}건의 기록도 삭제됩니다.\n\n`:'';if(!confirm(warning+'정말로 이 휴대전화의 자료를 지우고 시트 기준으로 다시 받으시겠습니까?'))return;try{setSync('','시트 자료 받는 중');const pulled=await api({action:'pull'});if(!pulled.ok)throw Error(pulled.error);db={placementDate:today(),bonus:3,houses:[0,0,0,0,0],entries:[],shipments:[],dayNotes:[],haccp:[],medicine:[],queue:[],pendingEntries:[]};mergeRemote(pulled.data||{});saveLocal();setSync('ok','시트 기준 새로고침 완료 · '+APP_VERSION);toast('시트 내용으로 새로고침했습니다');render()}catch(e){setSync('off','새로고침 실패');alert('시트 새로고침 실패: '+(e.message||e))}}
 function mergeMedicine(data){const inbound=(data['약품입고']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({kind:'in',id:String(r.id),date:String(r['날짜']).slice(0,10),product:String(r['약품명']||''),qty:Number(r['입고량']||0),unit:String(r['단위']||''),withdrawal:Number(r['휴약기간']||0),expiry:String(r['유효기간']||'').slice(0,10),lot:String(r['제조번호']||''),supplier:String(r['구입처']||''),note:String(r['특이사항']||''),createdAt:String(r['입력시간']||r.updatedAt)})),usage=(data['약품사용']||[]).filter(r=>String(r.deleted)!=='true'&&r.deleted!==true).map(r=>({kind:'out',id:String(r.id),date:String(r['날짜']).slice(0,10),house:Number(r['대상동']||0),productId:String(r['약품ID']||''),product:String(r['약품명']||''),qty:Number(r['사용량']||0),unit:String(r['단위']||''),purpose:String(r['사용목적']||''),withdrawal:Number(r['휴약기간']||0),safeDate:String(r['휴약종료일']||'').slice(0,10),age:Number(r['일령']||0),route:String(r['투여방법']||''),startDate:String(r['투약시작일']||r['날짜']).slice(0,10),lastDate:String(r['마지막투약일']||r['날짜']).slice(0,10),note:String(r['특이사항']||''),noteId:String(r['연결특이사항ID']||''),createdAt:String(r['입력시간']||r.updatedAt)}));db.medicine=[...inbound,...usage]}
 function todayCheckView(){
  const types=['오늘점검','소독·방역','약품관리','교육'],records=db.haccp.filter(x=>x.type==='오늘점검').sort((a,b)=>String(b.date+b.createdAt).localeCompare(String(a.date+a.createdAt))),saved=records.find(x=>x.date===today()&&x.house===selected),allChecked=TODAY_CHECK_ITEMS.every(x=>todayChecks[x]),hasBad=TODAY_CHECK_ITEMS.some(x=>todayChecks[x]==='이상');
