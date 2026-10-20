@@ -1,5 +1,5 @@
 const API='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
-const APP_VERSION='v18.1';
+const APP_VERSION='v18.2';
 const COLORS=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],SOFT=['#fef2f2','#fff7ed','#fffbeb','#f0fdf4','#eff6ff'];
 const $=s=>document.querySelector(s), uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(), today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}, fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TODAY_CHECK_ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
@@ -60,7 +60,8 @@ async function sync(){
   try{
    setSync('','시트 확인 중');
    if(db.queue.length){
-    const q=[...db.queue];
+    // 대량 삭제·저장은 한꺼번에 보내면 Apps Script 실행시간을 넘길 수 있어 10건씩 안전하게 전송합니다.
+    const q=db.queue.slice(0,10);
     const r=await api({action:'push',operations:q});
     if(!r.ok)throw Error(r.error);
     db.queue=db.queue.slice(q.length);
