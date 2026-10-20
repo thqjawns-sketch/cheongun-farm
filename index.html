@@ -1,21 +1,43 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#176b3a">
-  <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="청운농장">
-  <title>청운농장 육계 사육관리</title><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png"><link rel="apple-touch-icon" href="./icon-192.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#176b3a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="청운농장">
+  <title>청운농장 육계 사육관리</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <script>
     const FARM_APP_URL='https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec';
     const IS_INSTALLED=window.navigator.standalone||window.matchMedia('(display-mode: standalone)').matches;
-    if(IS_INSTALLED) window.location.replace(FARM_APP_URL+'?from=pwa&shell=17.8');
+    if(IS_INSTALLED) window.location.replace(FARM_APP_URL+'?from=pwa&shell=17.9');
   </script>
-  <style>*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f4f7f4;font-family:Arial,"Noto Sans KR",sans-serif}#farmApp{display:block;width:100%;height:100%;border:0;background:#fff}#installPanel{position:fixed;z-index:20;right:12px;top:calc(12px + env(safe-area-inset-top));display:none;align-items:center;gap:7px;padding:7px;border-radius:14px;background:#fff;box-shadow:0 5px 22px #102d1b38}#installButton{border:0;border-radius:10px;padding:10px 13px;background:#176b3a;color:#fff;font-weight:900}#closeInstall{width:34px;height:34px;border:0;border-radius:9px;background:#eef3ef;color:#526058;font-size:18px}#iosGuide{position:fixed;z-index:30;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));display:none;padding:13px 42px 13px 14px;border:1px solid #cddbd1;border-radius:13px;background:#fff;box-shadow:0 7px 25px #102d1b38;font-size:13px;line-height:1.45}#iosGuide button{position:absolute;right:8px;top:8px;width:30px;height:30px;border:0;border-radius:8px;background:#eef3ef}#loading{position:fixed;inset:0;z-index:5;display:grid;place-items:center;background:#f4f7f4;color:#176b3a;font-weight:900}#loading span{display:block;margin-top:8px;color:#6b786f;font-size:12px;font-weight:400}@media(display-mode:standalone){#installPanel,#iosGuide{display:none!important}}</style>
+  <style>
+    *{box-sizing:border-box}html,body{min-height:100%;margin:0;background:#f4f7f4;color:#132019;font-family:Arial,"Noto Sans KR",sans-serif}body{display:grid;place-items:center;padding:24px}.card{width:min(100%,480px);padding:36px 24px 28px;border:1px solid #d8e2da;border-radius:24px;background:#fff;box-shadow:0 12px 38px #102d1b18;text-align:center}.logo{width:92px;height:92px;border-radius:24px;box-shadow:0 8px 20px #176b3a25}.card h1{margin:20px 0 8px;font-size:28px}.card p{margin:0 0 25px;color:#68736c;line-height:1.55}.btn{display:block;width:100%;min-height:62px;margin-top:12px;border:0;border-radius:16px;font-size:18px;font-weight:900;cursor:pointer}.install{background:#176b3a;color:#fff}.open{border:2px solid #176b3a;background:#fff;color:#176b3a;text-decoration:none;line-height:58px}.help{margin-top:20px!important;font-size:13px}.status{min-height:22px;margin-top:12px;color:#176b3a;font-size:13px;font-weight:700}@media(display-mode:standalone){body{background:#176b3a}.card{display:none}}
+  </style>
 </head>
 <body>
-  <div id="loading"><div style="text-align:center"><img src="./icon-192.png" width="72" height="72" style="border-radius:18px" alt=""><br>청운농장 앱 여는 중<span>시트 자료를 안전하게 불러옵니다.</span></div></div>
-  <iframe id="farmApp" title="청운농장 육계 사육관리" allow="clipboard-read; clipboard-write"></iframe>
-  <div id="installPanel"><button id="installButton" type="button">청운농장 앱 설치</button><button id="closeInstall" type="button" aria-label="닫기">×</button></div>
-  <div id="iosGuide"><b>아이폰 설치 방법</b><br>Safari의 공유 버튼을 누른 뒤 <b>‘홈 화면에 추가’</b>를 선택하세요.<button type="button" aria-label="닫기">×</button></div>
-  <script>const frame=document.getElementById('farmApp'),loading=document.getElementById('loading'),panel=document.getElementById('installPanel'),installButton=document.getElementById('installButton');if(!IS_INSTALLED)frame.src=FARM_APP_URL;frame.addEventListener('load',()=>loading.style.display='none');setTimeout(()=>loading.style.display='none',12000);let installPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(!IS_INSTALLED)panel.style.display='flex'});installButton.addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;panel.style.display='none'});document.getElementById('closeInstall').onclick=()=>panel.style.display='none';window.addEventListener('appinstalled',()=>panel.style.display='none');const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);if(ios&&!IS_INSTALLED){const guide=document.getElementById('iosGuide');guide.style.display='block';guide.querySelector('button').onclick=()=>guide.style.display='none'}if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));</script>
-</body></html>
-
+  <main class="card">
+    <img class="logo" src="./icon-192.png" alt="청운농장 앱 아이콘">
+    <h1>청운농장 육계 사육관리</h1>
+    <p>농장 작업자가 함께 사용하는 사육관리 앱입니다.<br>아래 버튼으로 설치한 뒤 홈 화면에서 실행하세요.</p>
+    <button id="installButton" class="btn install" type="button">청운농장 앱 설치</button>
+    <a class="btn open" href="https://script.google.com/macros/s/AKfycbyUOaqnkX1VSrBJ3Ee7IcPMcbRsmrikeotDfqn7IXsyvsCfcXS6CRDeF3o86Wzu366ojg/exec">설치하지 않고 앱 열기</a>
+    <div id="status" class="status">설치 준비 중입니다.</div>
+    <p class="help">설치 버튼이 반응하지 않으면 크롬 메뉴(⋮)에서<br><b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 선택하세요.</p>
+  </main>
+  <script>
+    const installButton=document.getElementById('installButton'),status=document.getElementById('status');
+    let installPrompt=null;
+    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;status.textContent='설치할 수 있습니다.'});
+    installButton.addEventListener('click',async()=>{if(!installPrompt){status.textContent='크롬 메뉴(⋮)에서 홈 화면에 추가를 눌러주세요.';return}installPrompt.prompt();const result=await installPrompt.userChoice;installPrompt=null;status.textContent=result.outcome==='accepted'?'설치가 완료되면 홈 화면에서 실행하세요.':'설치가 취소되었습니다.'});
+    window.addEventListener('appinstalled',()=>{status.textContent='설치 완료! 홈 화면의 청운농장 아이콘을 눌러주세요.'});
+    if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));
+  </script>
+</body>
+</html>
