@@ -15,16 +15,16 @@
 const frame=document.getElementById('farmApp'),loading=document.getElementById('loading'),panel=document.getElementById('installPanel'),installButton=document.getElementById('installButton');
 frame.addEventListener('load',()=>loading.style.display='none');
 setTimeout(()=>loading.style.display='none',12000);
-let installPrompt=null,voiceRecognition=null;
+let installPrompt=null,voiceRecognition=null,voiceTarget=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(!window.matchMedia('(display-mode: standalone)').matches)panel.style.display='flex'});
 installButton.addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;panel.style.display='none'});
 document.getElementById('closeInstall').onclick=()=>panel.style.display='none';
 window.addEventListener('appinstalled',()=>panel.style.display='none');
 const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=window.navigator.standalone||window.matchMedia('(display-mode: standalone)').matches;
 if(ios&&!standalone){const guide=document.getElementById('iosGuide');guide.style.display='block';guide.querySelector('button').onclick=()=>guide.style.display='none'}
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=8'));
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=9'));
 
-function sendVoice(payload){if(frame.contentWindow)frame.contentWindow.postMessage(payload,'*')}
+function sendVoice(payload){const target=voiceTarget||frame.contentWindow;if(target)target.postMessage(payload,'*')}
 async function startTopLevelVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){sendVoice({type:'cheongun-voice-error',text:'이 기기에서는 음성입력을 지원하지 않습니다. Chrome을 최신 버전으로 업데이트해주세요.'});return}
@@ -48,6 +48,7 @@ async function startTopLevelVoice(){
 }
 window.addEventListener('message',e=>{
   if(!e.data||e.data.type!=='cheongun-start-voice')return;
+  voiceTarget=e.source;
   sendVoice({type:'cheongun-voice-ack'});
   startTopLevelVoice();
 });
