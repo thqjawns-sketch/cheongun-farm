@@ -22,32 +22,33 @@ document.getElementById('closeInstall').onclick=()=>panel.style.display='none';
 window.addEventListener('appinstalled',()=>panel.style.display='none');
 const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=window.navigator.standalone||window.matchMedia('(display-mode: standalone)').matches;
 if(ios&&!standalone){const guide=document.getElementById('iosGuide');guide.style.display='block';guide.querySelector('button').onclick=()=>guide.style.display='none'}
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=8'));
 
 function sendVoice(payload){if(frame.contentWindow)frame.contentWindow.postMessage(payload,'*')}
 async function startTopLevelVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){sendVoice({type:'cheongun-voice-error',message:'이 기기에서는 음성입력을 지원하지 않습니다. Chrome을 최신 버전으로 업데이트해주세요.'});return}
+  if(!SR){sendVoice({type:'cheongun-voice-error',text:'이 기기에서는 음성입력을 지원하지 않습니다. Chrome을 최신 버전으로 업데이트해주세요.'});return}
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('unsupported');
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     stream.getTracks().forEach(track=>track.stop());
   }catch(err){
-    sendVoice({type:'cheongun-voice-error',message:err&&err.name==='NotAllowedError'?'마이크 권한이 차단되었습니다. 사이트 설정에서 마이크를 허용해주세요.':'마이크를 사용할 수 없습니다. 기기 설정을 확인해주세요.'});
+    sendVoice({type:'cheongun-voice-error',text:err&&err.name==='NotAllowedError'?'마이크 권한이 차단되었습니다. 사이트 설정에서 마이크를 허용해주세요.':'마이크를 사용할 수 없습니다. 기기 설정을 확인해주세요.'});
     return;
   }
   voiceRecognition=new SR();
   voiceRecognition.lang='ko-KR';
   voiceRecognition.interimResults=false;
   voiceRecognition.maxAlternatives=1;
-  voiceRecognition.onstart=()=>sendVoice({type:'cheongun-voice-status',message:'말씀하세요: 1동 폐사 5 도태 6 특이사항 없음'});
+  voiceRecognition.onstart=()=>sendVoice({type:'cheongun-voice-status',text:'말씀하세요: 1동 폐사 5 도태 6 특이사항 없음',listening:true});
   voiceRecognition.onresult=e=>sendVoice({type:'cheongun-voice-result',text:e.results[0][0].transcript});
-  voiceRecognition.onerror=e=>sendVoice({type:'cheongun-voice-error',message:e.error==='not-allowed'?'마이크 권한을 허용해주세요.':e.error==='no-speech'?'음성이 들리지 않았습니다. 다시 눌러주세요.':'음성인식 오류: '+e.error});
-  voiceRecognition.onend=()=>{sendVoice({type:'cheongun-voice-status',message:'음성 입력이 끝났습니다.'});voiceRecognition=null};
-  try{voiceRecognition.start()}catch(err){sendVoice({type:'cheongun-voice-error',message:'음성입력을 시작할 수 없습니다. 다시 눌러주세요.'})}
+  voiceRecognition.onerror=e=>sendVoice({type:'cheongun-voice-error',text:e.error==='not-allowed'?'마이크 권한을 허용해주세요.':e.error==='no-speech'?'음성이 들리지 않았습니다. 다시 눌러주세요.':'음성인식 오류: '+e.error});
+  voiceRecognition.onend=()=>{sendVoice({type:'cheongun-voice-status',text:'음성 입력이 끝났습니다.'});voiceRecognition=null};
+  try{voiceRecognition.start()}catch(err){sendVoice({type:'cheongun-voice-error',text:'음성입력을 시작할 수 없습니다. 다시 눌러주세요.'})}
 }
 window.addEventListener('message',e=>{
-  if(e.source!==frame.contentWindow||!e.data||e.data.type!=='cheongun-start-voice')return;
+  if(!e.data||e.data.type!=='cheongun-start-voice')return;
+  sendVoice({type:'cheongun-voice-ack'});
   startTopLevelVoice();
 });
 </script>
