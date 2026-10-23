@@ -33,7 +33,7 @@ function updateCurrentFlock_(b){
  }finally{lock.releaseLock()}
 }
 function completeOverviewPdf_(b){
- const lock=LockService.getScriptLock();lock.waitLock(15000);let pdf=null;try{
+ const lock=LockService.getScriptLock();lock.waitLock(15000);let pdf=null,mutated=false;try{
  const p=PropertiesService.getScriptProperties(),key='OVERVIEW_DONE_'+String(b.requestId||'');if(!/^[a-zA-Z0-9_-]{10,100}$/.test(String(b.requestId||'')))throw Error('저장 요청번호를 확인해주세요.');const prior=p.getProperty(key);if(prior)return JSON.parse(prior);
  if(p.getProperty('COMPLETING'))throw Error('다른 사육완료 처리가 진행 중입니다.');
  const snapshot=settingsReportRows_(),f=snapshot.f;if(String(f.id)!==String(b.flockId)||snapshot.token!==b.token)throw Error('기록이 변경되었습니다. 최신 자료로 보고서를 다시 만들어주세요.');
@@ -42,12 +42,13 @@ function completeOverviewPdf_(b){
  p.setProperty('COMPLETING',new Date().toISOString());
  try{
   const title=safe_(((snapshot.data['농장정보']||[])[0]||{})['농장명']||'청운농장')+'_사육종합보고서_'+f.id+'.pdf';pdf=archiveFolder_().createFile(Utilities.newBlob(bytes,MimeType.PDF,title));if(pdf.getSize()!==bytes.length||pdf.getMimeType()!==MimeType.PDF)throw Error('PDF 보관 확인에 실패했습니다.');
-  const archive={id:f.id,입추일:f['입추일'],종료일:today_(),품종:f['품종']||'',공식입추수:snapshot.data['계사정보'].reduce((s,x)=>s+Number(x['공식입추수']||0),0),보고서파일ID:pdf.getId(),보고서URL:pdf.getUrl(),보고서명:title,생성일:new Date().toISOString()};const archives=backup['완료보고서'].filter(x=>String(x.id)!==String(f.id));archives.push(archive);settingsWriteRows_('완료보고서',archives);
+  if(settingsReportRows_().token!==snapshot.token)throw Error('PDF 보관 중 기록이 변경되었습니다. 최신 보고서를 다시 만들어주세요.');
+  const archive={id:f.id,입추일:f['입추일'],종료일:today_(),품종:f['품종']||'',공식입추수:snapshot.data['계사정보'].reduce((s,x)=>s+Number(x['공식입추수']||0),0),보고서파일ID:pdf.getId(),보고서URL:pdf.getUrl(),보고서명:title,생성일:new Date().toISOString()};const archives=backup['완료보고서'].filter(x=>String(x.id)!==String(f.id));archives.push(archive);mutated=true;settingsWriteRows_('완료보고서',archives);
   ['계사정보','사육기록','일일점검','출하기록','첨부파일'].forEach(n=>settingsWriteRows_(n,backup[n].filter(x=>x['회차ID']&&String(x['회차ID'])!==String(f.id))));settingsWriteRows_('현재회차',backup['현재회차'].filter(x=>String(x.id)!==String(f.id)));SpreadsheetApp.flush();
   const result={ok:true,completed:true,url:pdf.getUrl(),fileId:pdf.getId(),name:title};p.setProperty(key,JSON.stringify(result));
   // PDF에 포함된 임시 증빙사진은 보관 성공 후에만 휴지통으로 이동.
   snapshot.data['첨부파일'].forEach(x=>{try{DriveApp.getFileById(String(x['파일ID'])).setTrashed(true)}catch(e){}});
   return result;
- }catch(e){names.forEach(n=>settingsWriteRows_(n,backup[n]));SpreadsheetApp.flush();if(pdf)try{pdf.setTrashed(true)}catch(ignore){}throw e}finally{p.deleteProperty('COMPLETING')}
+ }catch(e){if(mutated){names.forEach(n=>settingsWriteRows_(n,backup[n]));SpreadsheetApp.flush()}if(pdf)try{pdf.setTrashed(true)}catch(ignore){}throw e}finally{p.deleteProperty('COMPLETING')}
  }finally{lock.releaseLock()}
 }
