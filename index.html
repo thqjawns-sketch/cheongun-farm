@@ -90,9 +90,24 @@ nav{overflow-x:auto;overflow-y:hidden;grid-template-columns:repeat(7,minmax(72px
 @media(min-width:1600px){.house-detail-cells b{font-size:25px}.house-detail-cells>div{padding:14px}.house-overview .overview-alert-row{font-size:16px}.house-daily-table{font-size:16px}}
 
 </style>
+<style>
+/* v2.2.7 daily record readability */
+.overview-board .overview-day-table{font-size:21px;font-weight:800;color:#17241b;font-variant-numeric:tabular-nums}
+.overview-board .overview-day-table th,.overview-board .overview-day-table td{padding:9px 8px;line-height:1.4}
+.overview-board .overview-day-table thead th{font-size:17px;font-weight:800}
+.overview-board .overview-day-table small{font-size:15px;font-weight:700}
+.overview-board .overview-day-table tbody th{font-size:19px;font-weight:800}
+.overview-board .overview-day-table tbody th small{display:block;color:#4b5d52;font-size:15px}
+.overview-board .overview-day-table .total{font-size:23px;font-weight:900;color:#17241b}
+.overview-board .overview-day-table tbody td small:first-of-type{color:#43554a!important;font-size:16px}
+.overview-board .house-daily-table tbody td{font-size:20px}
+.overview-board .house-daily-table tbody td:nth-child(2),.overview-board .house-daily-table tbody td:nth-child(3){font-size:22px;font-weight:800}
+.overview-board .house-daily-table tbody td.detail-text{font-size:17px;font-weight:650;line-height:1.45}
+.overview-board .house-daily-table tbody td.total{font-size:23px;font-weight:900}
+</style>
 </head><body><div class="app"><header><div><b id="farmTitle">청운농장</b><small id="ageTitle">사육 준비</small></div><b id="overviewTitle" class="overview-title">사육종합현황</b><div><span id="overviewDate" class="overview-date"></span><span id="sync" title="눌러서 최신자료 받기">↻ 최신자료 받기</span></div></header><main id="view"></main><nav id="nav"></nav></div><div id="busy" class="busy hidden"><div id="busyText">처리 중...</div></div>
 <script>
-const VERSION='2.2.6',C=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
+const VERSION='2.2.7',C=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
 const $=s=>document.querySelector(s),fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')},uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random();
 function timeText(v){if(!v)return'-';const d=new Date(v);return isNaN(d)?'-':d.toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'})}
 function dateTimeText(date,time){const d=String(date||'').slice(0,10),t=timeText(time);return(d?d.slice(5):'-')+(t!=='-'?' · '+t:'')}
@@ -261,5 +276,5 @@ function decorateOverviewV226(){
 overviewView=function(){overviewViewV220();enhanceOverviewMedicine();decorateOverviewV226()};
 document.addEventListener('DOMContentLoaded',()=>{const title=document.querySelector('#farmTitle');if(title){title.classList.add('farm-brand');new MutationObserver(()=>title.classList.add('farm-brand')).observe(title,{childList:true})}new MutationObserver(styleHouseButtons).observe(document.querySelector('#view'),{childList:true,subtree:true})});
 
-window.addEventListener('load',()=>{if(location.hostname.endsWith('github.io')&&'serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=27');$('#sync').onclick=()=>{if($('#busy').classList.contains('hidden'))pull(true,tab)};homeLoadingView();pull(true,'home')});
+window.addEventListener('load',()=>{if(location.hostname.endsWith('github.io')&&'serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=28');$('#sync').onclick=()=>{if($('#busy').classList.contains('hidden'))pull(true,tab)};homeLoadingView();pull(true,'home')});
 </script></body></html>
