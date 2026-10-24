@@ -91,7 +91,7 @@ nav{overflow-x:auto;overflow-y:hidden;grid-template-columns:repeat(7,minmax(72px
 
 </style>
 <style>
-/* v2.4.2 daily record readability */
+/* v2.4.3 daily record readability */
 .overview-board .overview-day-table{font-size:21px;font-weight:800;color:#17241b;font-variant-numeric:tabular-nums}
 .overview-board .overview-day-table th,.overview-board .overview-day-table td{padding:9px 8px;line-height:1.4}
 .overview-board .overview-day-table thead th{font-size:17px;font-weight:800}
@@ -106,7 +106,7 @@ nav{overflow-x:auto;overflow-y:hidden;grid-template-columns:repeat(7,minmax(72px
 .overview-board .house-daily-table tbody td.total{font-size:23px;font-weight:900}
 </style>
 <style>
-/* v2.4.2 compact daily records */
+/* v2.4.3 compact daily records */
 .overview-board .overview-day-table th,.overview-board .overview-day-table td,.overview-board .overview-day-table td.detail-text{text-align:center;vertical-align:middle}
 .daily-cell-meta{display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;font-size:16px;font-weight:700;color:#43554a;line-height:1.45;margin-top:2px}
 .daily-cell-meta>span{white-space:nowrap}
@@ -137,9 +137,9 @@ nav{overflow-x:auto;overflow-y:hidden;grid-template-columns:repeat(7,minmax(72px
 .report-paper header b{font-size:20px;white-space:nowrap;flex:0 0 auto}.report-paper header span{white-space:nowrap}.report-paper .overview-house-details .house-detail-cells{grid-template-columns:repeat(2,minmax(0,1fr))}.report-paper .overview-info-cell b{overflow-wrap:normal}
 
 .report-cover header{display:none!important}.report-cover .report-page-body{height:1250px}.report-cover-title{text-align:center;padding:54px 12px 42px;color:#17241b}.report-cover-farm{font-size:40px;font-weight:800;line-height:1.3}.report-cover-title h1{font-size:52px;line-height:1.3;margin:16px 0 22px!important;font-weight:800}.report-cover-title p{font-size:27px;font-weight:700;line-height:1.3;margin:0}.report-cover .overview-farm-grid,.report-cover .overview-entry-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.report-cover .overview-info-cell{min-width:0}.report-cover .overview-info-cell b{overflow-wrap:anywhere}.report-cover .overview-card{margin-bottom:18px!important}.report-cover .overview-card h2{font-size:22px!important}.report-cover .overview-info-cell span{font-size:14px}.report-cover .overview-info-cell b{font-size:16px!important}.report-cover footer{font-size:12px}
-</style><style>.report-cover .overview-board{display:flex;flex-direction:column;height:1238px}.report-cover-title{flex-shrink:0;margin-bottom:auto;padding:82px 12px 42px}.report-cover-farm{font-size:58px}.report-cover-title h1{font-size:76px!important;margin:22px 0 28px!important}.report-cover-title p{font-size:38px}.report-cover .overview-card{flex-shrink:0}.report-cover .overview-card:last-child{margin-bottom:0!important}</style></head><body><div class="app"><header><div><b id="farmTitle">청운농장</b><small id="ageTitle">사육 준비</small></div><b id="overviewTitle" class="overview-title">사육종합현황</b><div><span id="overviewDate" class="overview-date"></span><span id="sync" title="눌러서 최신자료 받기">↻ 최신자료 받기</span></div></header><main id="view"></main><nav id="nav"></nav></div><div id="busy" class="busy hidden"><div id="busyText">처리 중...</div></div>
+</style><style>.report-cover .overview-board{display:flex;flex-direction:column;height:1238px}.report-cover-title{flex-shrink:0;margin-bottom:auto;padding:82px 12px 42px}.report-cover-farm{font-size:58px}.report-cover-title h1{font-size:76px!important;margin:22px 0 28px!important}.report-cover-title p{font-size:38px}.report-cover .overview-card{flex-shrink:0}.report-cover .overview-card:last-child{margin-bottom:0!important}</style><style>.report-cover .overview-board{align-items:stretch}.report-cover-title{width:100%;align-self:stretch}</style></head><body><div class="app"><header><div><b id="farmTitle">청운농장</b><small id="ageTitle">사육 준비</small></div><b id="overviewTitle" class="overview-title">사육종합현황</b><div><span id="overviewDate" class="overview-date"></span><span id="sync" title="눌러서 최신자료 받기">↻ 최신자료 받기</span></div></header><main id="view"></main><nav id="nav"></nav></div><div id="busy" class="busy hidden"><div id="busyText">처리 중...</div></div>
 <script>
-const VERSION='2.4.2',C=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
+const VERSION='2.4.3',C=['#dc2626','#ea580c','#d99a00','#16803a','#2563eb'],ITEMS=['사료 공급','급수 상태','환기 상태','온도·습도','계군 건강상태','깔짚·바닥','폐사체 처리','출입·소독 관리','시설·전기'];
 const $=s=>document.querySelector(s),fmt=n=>Number(n||0).toLocaleString('ko-KR'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')},uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random();
 function timeText(v){if(!v)return'-';const d=new Date(v);return isNaN(d)?'-':d.toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'})}
 function dateTimeText(date,time){const d=String(date||'').slice(0,10),t=timeText(time);return(d?d.slice(5):'-')+(t!=='-'?' · '+t:'')}
@@ -386,6 +386,6 @@ const openTabBeforeReport=openTab;openTab=async function(name){if(overviewReport
 
 
 
-window.addEventListener('load',()=>{if(location.hostname.endsWith('github.io')&&'serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=33');$('#sync').onclick=()=>{if($('#busy').classList.contains('hidden'))pull(true,tab)};homeLoadingView();pull(true,'home')});
+window.addEventListener('load',()=>{if(location.hostname.endsWith('github.io')&&'serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=34');$('#sync').onclick=()=>{if($('#busy').classList.contains('hidden'))pull(true,tab)};homeLoadingView();pull(true,'home')});
 </script></body></html>
 
