@@ -1,0 +1,5 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const context={};vm.createContext(context);vm.runInContext(fs.readFileSync('entry-keypad.js','utf8'),context);const next=context.entryNextValue;
+assert.equal(next(0,'0'),0);assert.equal(next(0,'1'),1);assert.equal(next(1,'2'),12);assert.equal(next(12,'3'),123);assert.equal(next(123,'back'),12);assert.equal(next(1,'back'),0);assert.equal(next(0,'back'),0);assert.equal(next(123,'clear'),0);assert.equal(next(0,'add:-1'),0);assert.equal(next(123,'add:10'),133);assert.equal(next(133,'add:5'),138);assert.equal(next(138,'add:1'),139);assert.equal(next(139,'add:-1'),138);assert.equal(next(Number.MAX_SAFE_INTEGER,'add:1'),null);assert.equal(next('not-a-number','1'),null);assert.equal(next(12,'unexpected'),null);
+const locked=context.entryDigitKeys(true);assert.equal((locked.match(/ disabled/g)||[]).length,12);assert.equal((context.entryDigitKeys().match(/data-entry-key=/g)||[]).length,12);
+console.log('PASS: digit append, leading zeros, selected-value reset, backspace, adjustments, negative clamp, safe integer guard, 12 disabled keys');
