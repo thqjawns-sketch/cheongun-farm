@@ -1,0 +1,36 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const sheets=new Map();let failFlush=false,locked=false;
+class Sheet{constructor(){this.rows=[]}getLastRow(){return this.rows.length}setFrozenRows(){}getRange(r,c,h,w){return{getValues:()=>Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>this.rows[r-1+i]?.[c-1+j]??'')),setValues:v=>{for(let i=0;i<h;i++){this.rows[r-1+i]||=[];for(let j=0;j<w;j++)this.rows[r-1+i][c-1+j]=v[i][j]}}}}appendRow(v){this.rows.push(v)}}
+const ss={getSheetByName:n=>sheets.get(n),insertSheet:n=>{const s=new Sheet();sheets.set(n,s);return s}};
+const ctx={ss_:()=>ss,SpreadsheetApp:{flush:()=>{if(failFlush){failFlush=false;throw Error('lost response')}}},LockService:{getScriptLock:()=>({waitLock:()=>{assert(!locked);locked=true},releaseLock:()=>locked=false})},admin_:(b,fn)=>b.password==='test-only'?fn(b):{ok:false,error:'auth'},saveShipment_:()=>({ok:true,shipping:true}),saveOne_:()=>({ok:true}),deleteOne_:()=>({ok:true})};vm.createContext(ctx);vm.runInContext(fs.readFileSync('FarmLedger.gs','utf8'),ctx);
+let n=0;const id=()=> 'test-id-'+(++n),call=b=>ctx.farmLedgerRoute_({...b,password:'test-only'}),throws=(f)=>assert.throws(f),base={id:'entry-0001',kind:'expense',date:'2026-10-28',billMonth:'2026-10',category:'왕겨비',party:'왕겨업체',meter:'',amount:1200000,memo:'시험',usage:''};
+assert.equal(ctx.farmLedgerRoute_({action:'ledgerList'}).ok,false);assert.equal(sheets.size,0);
+assert.equal(ctx.farmLedgerRoute_({action:'saveShipment'}).ok,false);assert.equal(call({action:'saveShipment'}).shipping,true);
+assert.equal(ctx.farmLedgerRoute_({action:'save',sheet:'출하기록'}).ok,false);assert.equal(ctx.farmLedgerRoute_({action:'delete',sheet:'출하기록'}).ok,false);
+for(const page of ['ship','settings','haccp','ledger'])assert.equal(ctx.farmLedgerRoute_({action:'pull',page}).ok,false);
+for(const page of ['home','journal','overview'])assert.equal(ctx.farmLedgerRoute_({action:'pull',page}),null);
+assert.equal(call({action:'save',sheet:'사육장부'}).ok,false);
+const req={action:'ledgerCreate',opId:id(),entry:base,payment:{id:id(),date:'2026-10-28',amount:1000000}};
+let e=call(req).entry;assert.equal(ctx.flPaid_(e),1000000);assert.equal(e.amount-ctx.flPaid_(e),200000);assert(call(req).duplicate);assert.equal(call({action:'ledgerList'}).entries.length,1);
+throws(()=>call({...req,entry:{...base,amount:1300000}}));
+throws(()=>call({action:'ledgerPay',id:e.id,opId:id(),payment:{id:id(),date:'2026-11-03',amount:200001}}));
+const pay={action:'ledgerPay',id:e.id,opId:id(),payment:{id:id(),date:'2026-11-03',amount:200000}};
+failFlush=true;throws(()=>call(pay));e=call(pay).entry;assert.equal(ctx.flPaid_(e),1200000);assert.equal(e.payments.length,2);assert(call(pay).duplicate);
+throws(()=>call({action:'ledgerUpdate',id:e.id,opId:id(),expected:1,entry:{...base,amount:1300000}}));
+throws(()=>call({action:'ledgerUpdate',id:e.id,opId:id(),expected:e.revision,entry:{...base,amount:1000000}}));
+const cancel={action:'ledgerVoidPayment',id:e.id,paymentId:e.payments[1].id,expected:e.revision,opId:id()};e=call(cancel).entry;assert.equal(ctx.flPaid_(e),1000000);assert(call(cancel).duplicate);assert(e.payments[1].voided);
+e=call({action:'ledgerUpdate',id:e.id,opId:id(),expected:e.revision,entry:{...base,amount:1250000,memo:'=not a sheet formula'}}).entry;assert.equal(e.amount,1250000);
+for(const amount of [0,-1,1.2,NaN,'',null,true,1000000000000])throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),amount}}));
+throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),date:'2026-02-30'}}));
+throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),category:'전기요금',meter:''}}));
+const income=call({action:'ledgerCreate',opId:id(),entry:{...base,id:'income-0001',kind:'income',category:'사육비',amount:5000000},payment:{id:id(),date:'2026-11-01',amount:4000000}}).entry;
+vm.runInContext(fs.readFileSync('farm-ledger.js','utf8'),vm.createContext({today:()=> '2026-10-28',openTab:()=>{}}));
+const front={today:()=> '2026-10-28',openTab:()=>{}};vm.createContext(front);vm.runInContext(fs.readFileSync('farm-ledger.js','utf8'),front);
+const f={mode:'month',month:'2026-10',kind:'all',category:'',search:''};let summary=front.flSummary([e,income],f);assert.equal(summary.expense,1000000);assert.equal(summary.income,0);assert.equal(summary.payable,250000);assert.equal(summary.receivable,1000000);
+summary=front.flSummary([e,income],{...f,month:'2026-11'});assert.equal(summary.income,4000000);assert.equal(summary.expense,0);assert.equal(summary.claims.length,0);assert.equal(summary.payable,250000);
+assert.equal(front.flSummary([e,income],{...f,mode:'year',year:'2026'}).income,4000000);
+assert.equal(front.flSummary([e,income],{...f,mode:'range',start:'2026-10-28',end:'2026-11-01'}).payments.length,2);
+const voidReq={action:'ledgerVoid',id:e.id,expected:e.revision,opId:id()};e=call(voidReq).entry;assert(e.voided);assert.equal(front.flSummary([e,income],f).expense,0);assert(call(voidReq).duplicate);
+// 사육 회차 자료를 제거해도 독립 장부 시트·이력은 유지됩니다.
+ss.currentFlock=null;assert.equal(call({action:'ledgerList'}).entries.length,2);assert.equal(sheets.size,1);assert.equal(sheets.get('사육장부').rows[1][1][0],'{');assert(!locked);
+console.log('PASS: auth, protected shipping, independent permanent storage, partial/payment retry idempotency, lost response, overpayment, concurrency revisions, cancellation audit, invalid inputs, month/year/range cash totals, cross-month unpaid carryover');
