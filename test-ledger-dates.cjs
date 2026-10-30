@@ -1,0 +1,62 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),crypto=require('crypto');
+const sheets=new Map();let failFlush=false,locked=false;
+class Sheet{constructor(){this.rows=[]}getLastRow(){return this.rows.length}setFrozenRows(){}getRange(r,c,h,w){return{getValues:()=>Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>this.rows[r-1+i]?.[c-1+j]??'')),setValues:v=>{for(let i=0;i<h;i++){this.rows[r-1+i]||=[];for(let j=0;j<w;j++)this.rows[r-1+i][c-1+j]=v[i][j]}}}}appendRow(v){this.rows.push(v)}}
+const ss={getSheetByName:n=>sheets.get(n),insertSheet:n=>{const s=new Sheet();sheets.set(n,s);return s}};
+const ctx={ss_:()=>ss,Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(a,s)=>[...crypto.createHash('sha256').update(s).digest()]},SpreadsheetApp:{flush:()=>{if(failFlush){failFlush=false;throw Error('lost response')}}},LockService:{getScriptLock:()=>({waitLock:()=>{assert(!locked);locked=true},releaseLock:()=>locked=false})},admin_:(b,fn)=>b.password==='test-only'?fn(b):{ok:false,error:'auth'},saveShipment_:()=>({ok:true,shipping:true}),saveOne_:()=>({ok:true}),deleteOne_:()=>({ok:true})};vm.createContext(ctx);vm.runInContext(fs.readFileSync(process.argv[2]||'FarmLedger.gs','utf8'),ctx);
+let n=0;const id=()=> 'test-id-'+(++n),call=b=>ctx.farmLedgerRoute_({...b,password:'test-only'}),throws=f=>assert.throws(f),list=()=>call({action:'ledgerList'}),raw=()=>ctx.flRows_(ctx.flSheet_(false));
+for(const action of ['ledgerList','ledgerPartySave','ledgerRestore','ledgerRestorePayment','saveShipment'])assert.equal(ctx.farmLedgerRoute_({action}).ok,false);
+assert.equal(sheets.size,0);for(const page of ['ship','settings','haccp','ledger'])assert.equal(ctx.farmLedgerRoute_({action:'pull',page}).ok,false);for(const page of ['home','journal','overview'])assert.equal(ctx.farmLedgerRoute_({action:'pull',page}),null);assert.equal(call({action:'saveShipment'}).shipping,true);for(const sheet of ['출하기록','사육장부','장부거래처'])assert.equal(ctx.farmLedgerRoute_({action:'save',sheet}).ok,false);
+// 既存 v2.7 기록을 그대로 두고, 정규화된 이름에 고정 ID를 연결합니다. 조회는 원본을 쓰지 않습니다.
+const legacy={id:'legacy-entry-1',kind:'expense',date:'2026-10-01',billMonth:'2026-09',category:'왕겨비',party:'한빛 왕겨',meter:'',amount:1200000,usage:'',memo:'기존 기록',payments:[{id:'legacy-pay-1',date:'2026-10-12',amount:1000000,voided:false}],revision:1,receipts:{},updatedAt:'2026-10-12T12:00:00Z'};
+ctx.flStore_(ctx.flSheet_(true),legacy);const originalBytes=sheets.get('사육장부').rows[1][1];let r=list();assert.equal(r.ledgerVersion,2);let p=r.parties.find(x=>x.name==='한빛 왕겨'),e=r.entries[0];assert(p.id.startsWith('LEGACY-'));assert.equal(e.partyId,p.id);assert.equal(sheets.get('사육장부').rows[1][1],originalBytes);assert(!sheets.has('장부거래처'));
+const renamed={action:'ledgerPartySave',opId:id(),expected:p.revision,party:{id:p.id,name:'한빛축산',hidden:false,scopes:p.scopes}};failFlush=true;throws(()=>call(renamed));r=call(renamed);assert(r.duplicate);p=r.party;r=list();assert.equal(r.entries[0].partyId,p.id);assert.equal(r.entries[0].partyName,'한빛축산');assert.equal(r.entries[0].date,'2026-10-01');assert.equal(r.entries[0].billMonth,'2026-09');assert.equal(r.entries[0].payments[0].date,'2026-10-12');assert.equal(sheets.get('사육장부').rows[1][1],originalBytes);
+let dup=call({action:'ledgerPartySave',opId:id(),expected:0,party:{id:id(),name:'한빛 축산',scopes:[]}});assert(!dup.ok);assert.equal(dup.existingPartyId,p.id);dup=call({action:'ledgerPartySave',opId:id(),expected:0,party:{id:id(),name:'한빛왕겨',scopes:[]}});assert(!dup.ok);assert.equal(dup.existingPartyId,p.id);
+throws(()=>call({...renamed,opId:id(),expected:0}));let party2=call({action:'ledgerPartySave',opId:id(),expected:0,party:{id:id(),name:'새 거래처',hidden:false,scopes:['expense:약품비']}}).party;
+const base={id:'entry-0001',kind:'expense',date:'2026-10-29',billMonth:'',category:'약품비',partyId:party2.id,party:party2.name,meter:'',amount:1200000,memo:'시험',usage:''};
+const req={action:'ledgerCreate',opId:id(),entry:base,payment:{id:id(),date:'2026-10-29',amount:1000000}};
+e=call(req).entry;assert.equal(ctx.flPaid_(e),1000000);assert(call(req).duplicate);assert(!('receipts' in e));throws(()=>call({...req,entry:{...base,amount:1300000}}));
+throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),partyId:'',party:''},payment:null}));
+throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),partyId:'',party:'직접입력'},payment:null}));
+throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id()},payment:{id:id(),date:'2026-11-01',amount:1000000}}));
+// 새 거래 전액 지급은 거래처 없이 가능. 비정기 항목은 몇 월분을 요구하지 않습니다.
+call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),partyId:'',party:'',amount:100},payment:{id:id(),date:'2026-10-29',amount:100}});
+const pay={action:'ledgerPay',id:e.id,opId:id(),payment:{id:id(),date:'2026-11-03',amount:200000}};failFlush=true;throws(()=>call(pay));e=call(pay).entry;assert(call(pay).duplicate);assert.equal(e.payments.length,2);assert.equal(ctx.flPaid_(e),1200000);throws(()=>call({...pay,opId:id(),payment:{id:id(),date:'2026-11-03',amount:1}}));
+const cancel={action:'ledgerVoidPayment',id:e.id,paymentId:e.payments[1].id,expected:e.revision,opId:id()};e=call(cancel).entry;assert.equal(ctx.flPaid_(e),1000000);assert(call(cancel).duplicate);
+const restore={action:'ledgerRestorePayment',id:e.id,paymentId:e.payments[1].id,expected:e.revision,opId:id()};e=call(restore).entry;assert.equal(ctx.flPaid_(e),1200000);assert(call(restore).duplicate);
+e=call({...cancel,opId:id(),expected:e.revision}).entry;const refill={action:'ledgerPay',id:e.id,opId:id(),payment:{id:id(),date:'2026-11-05',amount:200000}};e=call(refill).entry;throws(()=>call({...restore,opId:id(),expected:e.revision}));
+const voidReq={action:'ledgerVoid',id:e.id,expected:e.revision,opId:id()};e=call(voidReq).entry;assert(e.voided);assert(call(voidReq).duplicate);throws(()=>call({action:'ledgerPay',id:e.id,opId:id(),payment:{id:id(),date:'2026-11-06',amount:1}}));
+const restoreEntry={action:'ledgerRestore',id:e.id,expected:e.revision,opId:id()};e=call(restoreEntry).entry;assert(!e.voided);assert(call(restoreEntry).duplicate);assert(e.payments[1].voided);assert.equal(e.payments.length,3);assert(e.audit.length>=7);
+// 숨겨도 과거 거래·잔액 유지. 숨긴 거래처를 새 거래에 사용할 수 없습니다.
+party2=call({action:'ledgerPartySave',expected:party2.revision,opId:id(),party:{...party2,hidden:true}}).party;assert(list().entries.some(x=>x.partyId===party2.id));throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id()},payment:null}));
+party2=call({action:'ledgerPartySave',expected:party2.revision,opId:id(),party:{...party2,hidden:false}}).party;
+throws(()=>call({action:'ledgerUpdate',id:e.id,opId:id(),expected:e.revision,entry:{...base,amount:1000000}}));throws(()=>call({action:'ledgerUpdate',id:e.id,opId:id(),expected:0,entry:{...base}}));
+for(const amount of [0,-1,1.2,NaN,'',null,true,1000000000000])throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),amount}}));throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),date:'2026-02-30'}}));throws(()=>call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),category:'전기요금',meter:''}}));
+const front={today:()=> '2026-10-29',openTab:()=>{},fmt:n=>n,esc:s=>s};vm.createContext(front);vm.runInContext(fs.readFileSync('farm-ledger.js','utf8'),front);const f={mode:'month',month:'2026-10',kind:'all',category:'',search:''};let summary=front.flSummary([e],f);assert.equal(summary.expense,1000000);summary=front.flSummary([e],{...f,month:'2026-11'});assert.equal(summary.expense,200000);assert.equal(summary.claims.length,0);assert.equal(front.flSummary([e],{...f,mode:'year',year:'2026'}).expense,1200000);assert.equal(front.flSummary([e],{...f,mode:'range',start:'2026-10-29',end:'2026-11-05'}).expense,1200000);assert(front.flSimilar('한빛 왕겨','한빛왕겨'));assert(front.flSimilar('청운약품','청운약픔'));assert(!front.flSimilar('청운약품','다른상사'));
+const before=sheets.get('사육장부').rows.length;ss.currentFlock=null;assert.equal(list().entries.length,before-1);assert(sheets.has('장부거래처'));assert(!locked);
+console.log('PASS v2.8: auth; read-only legacy linking; stable IDs/aliases across rename; concurrent normalized duplicate prevention; hidden-party integrity; unified date/optional month; partial-payment retry/lost response; restore audit/overpayment protection; month/year/range totals; permanent independent sheets');
+
+// Date correction integration: two active payments + cancelled payment, no balance changes.
+e=list().entries.find(x=>x.id==='entry-0001');
+const beforeDateEdit=JSON.parse(JSON.stringify(e));
+const dateReq={action:'ledgerUpdateWithDates',id:e.id,opId:id(),expected:e.revision,entry:{...e,date:'2026-09-30'},paymentDates:e.payments.filter(p=>!p.voided).map((p,i)=>({id:p.id,date:i?'2026-12-01':'2026-11-01'}))};
+assert.equal(ctx.farmLedgerRoute_({...dateReq,password:'wrong'}).ok,false);
+const rawBefore=JSON.stringify(raw());
+for(const paymentDates of [null,[],[dateReq.paymentDates[0],dateReq.paymentDates[0]],dateReq.paymentDates.map((p,i)=>({...p,date:i?'2026-02-30':p.date})),dateReq.paymentDates.map((p,i)=>({...p,id:i?'unknown-pay-id':p.id}))]){throws(()=>call({...dateReq,opId:id(),paymentDates}));assert.equal(JSON.stringify(raw()),rawBefore)}
+throws(()=>call({...dateReq,opId:id(),expected:0}));assert.equal(JSON.stringify(raw()),rawBefore);
+failFlush=true;throws(()=>call(dateReq));e=call(dateReq).entry;assert(call(dateReq).duplicate);
+assert.equal(e.date,'2026-09-30');assert.equal(e.payments[0].date,'2026-11-01');assert.equal(e.payments[2].date,'2026-12-01');
+assert.deepEqual(e.payments[1],beforeDateEdit.payments[1]);
+assert.equal(ctx.flPaid_(e),1200000);assert.equal(e.amount,beforeDateEdit.amount);assert.equal(e.partyId,beforeDateEdit.partyId);assert.equal(e.revision,beforeDateEdit.revision+1);
+const change=e.audit.at(-1);assert.equal(change.dateChanges.length,3);assert.equal(change.dateChanges[0].before,'2026-10-29');assert.equal(change.dateChanges[0].after,'2026-09-30');assert.equal(change.dateChanges[1].paymentId,e.payments[0].id);assert(!('_dateChanges' in e));
+assert.equal(front.flSummary([e],f).expense,0);assert.equal(front.flSummary([e],{...f,month:'2026-11'}).expense,1000000);assert.equal(front.flSummary([e],{...f,month:'2026-12'}).expense,200000);assert.equal(front.flSummary([e],{...f,mode:'year',year:'2026'}).expense,1200000);
+throws(()=>call({...dateReq,opId:id()}));throws(()=>call({...dateReq,paymentDates:dateReq.paymentDates.map(p=>({...p,date:'2026-11-02'}))}));
+let noPay=call({action:'ledgerCreate',opId:id(),entry:{...base,id:id()},payment:null}).entry;
+noPay=call({action:'ledgerUpdateWithDates',id:noPay.id,opId:id(),expected:noPay.revision,entry:{...noPay,date:'2026-09-15'},paymentDates:[]}).entry;assert.equal(noPay.date,'2026-09-15');assert.equal(noPay.payments.length,0);
+let inc=call({action:'ledgerCreate',opId:id(),entry:{...base,id:id(),kind:'income',amount:100},payment:{id:id(),date:base.date,amount:100}}).entry;
+inc=call({action:'ledgerUpdateWithDates',id:inc.id,opId:id(),expected:inc.revision,entry:inc,paymentDates:[{id:inc.payments[0].id,date:'2027-01-02'}]}).entry;assert.equal(front.flSummary([inc],{...f,mode:'year',year:'2027'}).income,100);
+inc=call({action:'ledgerVoid',id:inc.id,opId:id(),expected:inc.revision}).entry;throws(()=>call({action:'ledgerUpdateWithDates',id:inc.id,opId:id(),expected:inc.revision,entry:inc,paymentDates:[{id:inc.payments[0].id,date:'2027-01-03'}]}));
+const html=fs.readFileSync(process.argv[3]||'index.html','utf8');for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);
+const helpers=html.slice(html.indexOf('function flEditDatesHtml'),html.indexOf('function flDetail(id)'));
+vm.runInContext(helpers,front);assert(front.flEditDatesHtml(e).includes('data-fl-payment-date'));assert(!front.flEditDatesHtml(e).includes('value="2026-11-03"'));assert(front.flDateAuditHtml(e).includes('2026-10-29 → 2026-09-30'));assert(front.flDateAuditHtml(e).includes('날짜 변경 이력'));
+assert(html.includes("action:old?'ledgerUpdateWithDates':'ledgerCreate'"));assert(!html.includes('기존 날짜는 유지됩니다'));assert(!locked);
+console.log('PASS v2.9.1 date edits: auth, whole-request validation/no writes, exact active payment set, cancelled payments preserved, revision conflict, atomic save/retry, before-after audit, unchanged balances/IDs, month/year totals, income, unpaid, cancelled transaction guards, client date controls and syntax');
